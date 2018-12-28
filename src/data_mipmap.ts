@@ -57,9 +57,7 @@ export class DataMipmap {
     if (utils.isNil(resolution)) { return 0; }
 
     const factor = resolution / this.resolution;
-    let level = utils.clamp(Math.floor(Math.log(factor) / Math.log(2.0)), 0, this.mipMaps.length - 1);
-
-    return level;
+    return utils.clamp(Math.floor(Math.log(factor) / Math.log(2.0)), 0, this.mipMaps.length - 1);
   }
 
   /**
@@ -163,9 +161,9 @@ export class DataMipmap {
   protected getTime(point: ChartPoint): number {
     const x = point.x || point.t;
 
-    if (typeof x === "number") {
+    if (typeof x === 'number') {
       return x;
-    } else if (typeof x === "string") {
+    } else if (typeof x === 'string') {
       return new Date(x).getTime();
     } else {
       return x.getTime();

@@ -127,7 +127,6 @@ export class LTTBDataMipmap extends DataMipmap {
             const current = this.originalData[i];
             const next = this.originalData[i + 1];
 
-
             timeDistances += Math.abs(this.getTime(current) - this.getTime(next));
         }
 

@@ -1,6 +1,6 @@
 import { ChartPoint } from 'chart.js';
 import { Scale } from './chartjs_ext';
-import moment_module = require('moment');
+import * as moment_module from 'moment';
 const moment = (window && (window as any).moment) ? (window as any).moment : moment_module;
 import * as utils from './utils';
 
@@ -33,11 +33,13 @@ export function rangeIsEqual(previousValue: Range, currentValue: Range): boolean
     previousValue = [getCompareValue(previousValue[0]), getCompareValue(previousValue[1])];
     currentValue = [getCompareValue(currentValue[0]), getCompareValue(currentValue[1])];
 
-    return previousValue[0] === currentValue[0] && previousValue[1] == currentValue[1];
+    return previousValue[0] === currentValue[0] && previousValue[1] === currentValue[1];
 }
 
 export function getScaleRange(scale: Scale): Range {
-    if (utils.isNil(scale)) return [null, null];
+    if (utils.isNil(scale)) {
+        return [null, null];
+    }
 
     const start = scale.getValueForPixel(scale.left);
     const end = scale.getValueForPixel(scale.right);

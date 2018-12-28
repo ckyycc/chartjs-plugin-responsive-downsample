@@ -1,4 +1,4 @@
-import moment_module = require('moment');
+import * as moment_module from 'moment';
 const moment = (window && (window as any).moment) ? (window as any).moment : moment_module;
 import { Chart, ChartData, ChartDataSets, ChartPoint } from 'chart.js';
 import { IChartPlugin, TimeScale } from './chartjs_ext';
@@ -24,7 +24,7 @@ export interface ResponsiveDownsamplePluginOptions {
    */
   aggregationAlgorithm?: 'AVG' | 'LTTB';
   /**
-   * Desired mininmal distance between data points in pixels. Default: 1 pixel
+   * Desired minimal distance between data points in pixels. Default: 1 pixel
    */
   desiredDataPointDistance?: number;
   /**
@@ -47,19 +47,26 @@ export interface ResponsiveDownsamplePluginOptions {
    * Scale range of x axis
    */
   scaleRange?: data_culling.Range;
+  /**
+   * Draw points only if the points number less than the limitation
+   */
+  maxNumPointsToDraw?: number;
 }
 
+// Using dynamic flag to fix the issue of ng-packagr #696: Lambda not supported
+// @dynamic
 /**
  * Chart js Plugin for downsampling data
  */
 export class ResponsiveDownsamplePlugin implements IChartPlugin {
   static getPluginOptions(chart: any): ResponsiveDownsamplePluginOptions {
-    let options: ResponsiveDownsamplePluginOptions = chart.options.responsiveDownsample || {};
+    const options: ResponsiveDownsamplePluginOptions = chart.options.responsiveDownsample || {};
     utils.defaultsDeep(options, {
       enabled: false,
       aggregationAlgorithm: 'LTTB',
       desiredDataPointDistance: 1,
       minNumPoints: 100,
+      maxNumPointsToDraw: 100,
       cullData: true
     });
 
@@ -75,17 +82,16 @@ export class ResponsiveDownsamplePlugin implements IChartPlugin {
       utils.findInArray(
         chart.data.datasets as MipMapDataSets[],
         (dataset) => {
-          return utils.isNil(dataset.mipMap)
+          return utils.isNil(dataset.mipMap);
         }
       )
     );
   }
 
   static createDataMipMap(chart: Chart, options: ResponsiveDownsamplePluginOptions): void {
-    chart.data.datasets.forEach((dataset: MipMapDataSets, i) => {
-      const data = !utils.isNil(dataset.originalData)
-        ? dataset.originalData
-        : dataset.data as ChartPoint[];
+    chart.data.datasets.forEach((dataset: MipMapDataSets) => {
+      // @ts-ignore
+      const data = !utils.isNil(dataset.originalData) ? dataset.originalData : dataset.data as ChartPoint[];
 
       const mipMap = (options.aggregationAlgorithm === 'LTTB')
         ? new LTTBDataMipmap(data, options.minNumPoints)
@@ -93,6 +99,7 @@ export class ResponsiveDownsamplePlugin implements IChartPlugin {
 
       dataset.originalData = data;
       dataset.mipMap = mipMap;
+      // @ts-ignore
       dataset.data = mipMap.getMipMapLevel(mipMap.getNumLevel() - 1); // set last level for first render pass
     });
   }
@@ -101,10 +108,9 @@ export class ResponsiveDownsamplePlugin implements IChartPlugin {
     let updated = false;
 
     chart.data.datasets.forEach((dataset: MipMapDataSets) => {
-      if (
-        !utils.isNil(dataset.originalData) &&
-        dataset.data !== dataset.originalData
-      ) {
+      // @ts-ignore
+      if (!utils.isNil(dataset.originalData) && dataset.data !== dataset.originalData) {
+        // @ts-ignore
         dataset.data = dataset.originalData;
         updated = true;
       }
@@ -114,12 +120,14 @@ export class ResponsiveDownsamplePlugin implements IChartPlugin {
   }
 
   static getTargetResolution(chart: Chart, options: ResponsiveDownsamplePluginOptions): number {
-    const xScale: TimeScale = (chart as any).scales["x-axis-0"];
+    const xScale: TimeScale = (chart as any).scales['x-axis-0'];
 
-    if (utils.isNil(xScale)) return null;
+    if (utils.isNil(xScale)) {
+      return null;
+    }
 
-    let start = moment(xScale.getValueForPixel(xScale.left) as any);
-    let end = moment(xScale.getValueForPixel(xScale.left + 1) as any);
+    const start = moment(xScale.getValueForPixel(xScale.left) as any);
+    const end = moment(xScale.getValueForPixel(xScale.left + 1) as any);
     const targetResolution = end.diff(start);
 
     return targetResolution * options.desiredDataPointDistance;
@@ -128,11 +136,13 @@ export class ResponsiveDownsamplePlugin implements IChartPlugin {
   static updateMipMap(chart: Chart, options: ResponsiveDownsamplePluginOptions, rangeChanged: boolean): boolean {
     let updated = false;
 
-    chart.data.datasets.forEach((dataset: MipMapDataSets, i) => {
+    chart.data.datasets.forEach((dataset: MipMapDataSets) => {
       const mipMap = dataset.mipMap;
-      if (utils.isNil(mipMap)) return;
+      if (utils.isNil(mipMap)) {
+        return;
+      }
 
-      let mipMalLevel = mipMap.getMipMapIndexForResolution(options.targetResolution);
+      const mipMalLevel = mipMap.getMipMapIndexForResolution(options.targetResolution);
       if (mipMalLevel === dataset.currentMipMapLevel && !rangeChanged) {
         // skip update if mip map level and data range did not change
         return;
@@ -142,9 +152,10 @@ export class ResponsiveDownsamplePlugin implements IChartPlugin {
 
       let newData = mipMap.getMipMapLevel(mipMalLevel);
       if (options.cullData) {
-        newData = data_culling.cullData(newData, options.scaleRange)
+        newData = data_culling.cullData(newData, options.scaleRange);
       }
 
+      // @ts-ignore
       dataset.data = newData;
     });
 
@@ -190,7 +201,7 @@ export class ResponsiveDownsamplePlugin implements IChartPlugin {
     }
 
     const targetResolution = ResponsiveDownsamplePlugin.getTargetResolution(chart, options);
-    const xScale: TimeScale = (chart as any).scales["x-axis-0"];
+    const xScale: TimeScale = (chart as any).scales['x-axis-0'];
     const scaleRange = data_culling.getScaleRange(xScale);
     const rangeChanged = !data_culling.rangeIsEqual(options.scaleRange, scaleRange);
 
@@ -203,6 +214,7 @@ export class ResponsiveDownsamplePlugin implements IChartPlugin {
       options.needsUpdate = false;
 
       if (ResponsiveDownsamplePlugin.updateMipMap(chart, options, rangeChanged)) {
+        utils.changePointRadius(chart, options);
         // update chart and cancel current render
         chart.update(0);
 
